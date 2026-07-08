@@ -6,138 +6,209 @@ import json
 from collections import defaultdict
 import math
 
-# --- Настройка страницы ---
-st.set_page_config(page_title="Ping-Pong Pro Tournament", page_icon="🏓", layout="wide")
+# --- Конфигурация страницы ---
+st.set_page_config(
+    page_title="Ping-Pong Pro Tournament",
+    page_icon="🏓",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
 # --- Инициализация состояния ---
 def init_state():
-    if 'stage' not in st.session_state:
-        st.session_state.stage = 'setup'          # setup, group, playoff, end
+    if "stage" not in st.session_state:
+        st.session_state.stage = "setup"          # setup, group, playoff, end
         st.session_state.players = []
-        st.session_state.matches = []             # список сыгранных матчей (группа)
+        st.session_state.matches = []             # сыгранные матчи группового этапа
         st.session_state.pairs = []               # все пары для группового этапа
         st.session_state.playoff_bracket = []     # сетка плей-офф
-        st.session_state.current_round_idx = 0    # индекс текущего раунда для отображения
         st.session_state.champion = None
         st.session_state.third_place = None
-        st.session_state.target_score = 11        # очков для победы
+        st.session_state.target_score = 11
         st.session_state.tournament_name = "Ping-Pong Pro"
 
 init_state()
 
-# --- Стили (Premium Dark UI) ---
+# --- Стили (Premium Dark UI с анимациями) ---
 st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&display=swap');
-    .stApp { background-color: #0f172a; color: #f8fafc; }
-    .st-emotion-cache-16txtl3 { padding: 2rem 1rem; }
-    h1, h2, h3, .player-name { font-family: 'Montserrat', sans-serif; font-weight: 800; }
-    .main-card {
-        background: linear-gradient(145deg, #1e293b, #172033);
-        padding: 25px;
-        border-radius: 20px;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-        border: 1px solid #334155;
-        text-align: center;
-        margin-bottom: 20px;
-        transition: all 0.2s;
-    }
-    .main-card:hover { border-color: #f97316; }
-    .player-name { font-size: 28px; color: #f1f5f9; margin: 10px 0; text-transform: uppercase; letter-spacing: 1px; }
-    .vs-text { font-size: 16px; color: #f97316; font-weight: 800; letter-spacing: 2px; }
-    .stButton>button {
-        background: linear-gradient(to right, #f97316, #ea580c);
-        color: white;
-        border-radius: 12px;
-        border: none;
-        padding: 10px 24px;
-        font-weight: 700;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 15px rgba(249, 115, 22, 0.3);
-    }
-    .stButton>button:hover {
-        background: linear-gradient(to right, #ea580c, #c2410c);
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(249, 115, 22, 0.5);
-    }
-    .bracket-container {
-        display: flex;
-        overflow-x: auto;
-        padding: 20px 0;
-        gap: 40px;
-        justify-content: center;
-        min-height: 300px;
-    }
-    .round-column {
-        display: flex;
-        flex-direction: column;
-        justify-content: space-around;
-        min-width: 200px;
-        gap: 20px;
-        position: relative;
-    }
-    .round-column::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        left: -20px;
-        border-left: 2px dashed #334155;
-    }
-    .round-column:first-child::before { display: none; }
-    .bracket-match {
-        background: #1e293b;
-        border: 1px solid #334155;
-        border-radius: 10px;
-        padding: 12px;
-        position: relative;
-        transition: all 0.2s;
-    }
-    .bracket-match:hover { border-color: #f97316; }
-    .bracket-match.bye-match { opacity: 0.6; border-style: dashed; }
-    .bracket-team {
-        display: flex;
-        justify-content: space-between;
-        padding: 5px 0;
-        font-family: 'Montserrat', sans-serif;
-        font-weight: 600;
-    }
-    .team-name { color: #cbd5e1; }
-    .team-score { color: #94a3b8; font-weight: 800; }
-    .winner-bg { background-color: rgba(34, 197, 94, 0.15); border-left: 4px solid #22c55e; }
-    .winner-text { color: #4ade80 !important; }
-    .loser-text { color: #64748b !important; }
-    .champion-banner {
-        background: radial-gradient(circle, #1e293b, #0f172a);
-        padding: 40px;
-        border-radius: 20px;
-        text-align: center;
-        border: 2px solid #f97316;
-        box-shadow: 0 0 30px rgba(249, 115, 22, 0.3);
-        animation: glow 2s infinite alternate;
-    }
-    @keyframes glow {
-        0% { box-shadow: 0 0 20px rgba(249,115,22,0.3); }
-        100% { box-shadow: 0 0 40px rgba(249,115,22,0.7); }
-    }
-    .dataframe { width: 100%; }
-    th { background-color: #1e293b !important; color: #f97316 !important; text-transform: uppercase; }
-    td { color: #f1f5f9 !important; background-color: #0f172a !important; }
-    .highlight-match {
-        border: 2px solid #f97316 !important;
-        box-shadow: 0 0 15px rgba(249,115,22,0.5);
-    }
-    .small-text { font-size: 0.8rem; color: #94a3b8; }
-    </style>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+
+* { font-family: 'Inter', sans-serif; }
+
+.stApp {
+    background: #0b1120;
+    color: #e2e8f0;
+}
+
+/* Заголовки */
+h1, h2, h3, h4, .player-name {
+    font-weight: 800;
+    letter-spacing: -0.02em;
+}
+
+/* Карточки */
+.main-card {
+    background: linear-gradient(145deg, #1a2332, #0f172a);
+    padding: 2rem 1.5rem;
+    border-radius: 24px;
+    border: 1px solid #2d3a4f;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.6);
+    transition: transform 0.2s, border-color 0.2s;
+}
+.main-card:hover {
+    border-color: #f97316;
+    transform: translateY(-2px);
+}
+
+/* Кнопки */
+.stButton > button {
+    background: linear-gradient(135deg, #f97316, #ea580c);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 0.6rem 1.8rem;
+    font-weight: 700;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 14px rgba(249,115,22,0.35);
+    width: 100%;
+}
+.stButton > button:hover {
+    transform: scale(1.02);
+    box-shadow: 0 6px 20px rgba(249,115,22,0.5);
+    background: linear-gradient(135deg, #ea580c, #c2410c);
+}
+
+/* Игроки */
+.player-name {
+    font-size: 2rem;
+    color: #f1f5f9;
+    text-transform: uppercase;
+    margin: 0.2rem 0;
+}
+.vs-text {
+    font-size: 1.2rem;
+    color: #f97316;
+    font-weight: 800;
+    letter-spacing: 3px;
+}
+
+/* Сетка плей-офф */
+.bracket-container {
+    display: flex;
+    overflow-x: auto;
+    padding: 1.5rem 0;
+    gap: 2.5rem;
+    justify-content: center;
+}
+.round-column {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    min-width: 200px;
+    gap: 1.2rem;
+    position: relative;
+}
+.round-column:not(:first-child)::before {
+    content: '';
+    position: absolute;
+    left: -1.2rem;
+    top: 10%;
+    bottom: 10%;
+    border-left: 2px dashed #334155;
+}
+.bracket-match {
+    background: #1a2332;
+    border: 1px solid #2d3a4f;
+    border-radius: 12px;
+    padding: 0.8rem 1rem;
+    transition: all 0.2s;
+}
+.bracket-match:hover {
+    border-color: #f97316;
+}
+.bracket-match.bye-match {
+    opacity: 0.6;
+    border-style: dashed;
+}
+.bracket-match.highlight {
+    border-color: #f97316 !important;
+    box-shadow: 0 0 20px rgba(249,115,22,0.4);
+}
+.bracket-team {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.2rem 0;
+    font-weight: 600;
+}
+.team-name { color: #cbd5e1; }
+.team-score { color: #94a3b8; font-weight: 700; }
+.winner-bg {
+    background: rgba(34,197,94,0.08);
+    border-left: 4px solid #22c55e;
+}
+.winner-text { color: #4ade80 !important; }
+.loser-text { color: #64748b !important; }
+
+/* Баннер чемпиона */
+.champion-banner {
+    background: radial-gradient(circle at center, #1e293b, #0b1120);
+    padding: 2.5rem;
+    border-radius: 30px;
+    text-align: center;
+    border: 2px solid #f97316;
+    box-shadow: 0 0 40px rgba(249,115,22,0.25);
+    animation: pulse-glow 2s infinite alternate;
+}
+@keyframes pulse-glow {
+    0% { box-shadow: 0 0 20px rgba(249,115,22,0.2); }
+    100% { box-shadow: 0 0 50px rgba(249,115,22,0.5); }
+}
+
+/* Таблица */
+.dataframe {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 4px;
+}
+th {
+    background: #1a2332 !important;
+    color: #f97316 !important;
+    font-weight: 700 !important;
+    text-transform: uppercase;
+    font-size: 0.8rem !important;
+    padding: 10px 8px !important;
+}
+td {
+    background: #0f172a !important;
+    color: #e2e8f0 !important;
+    padding: 8px !important;
+}
+
+/* Прочие элементы */
+.small-text {
+    font-size: 0.8rem;
+    color: #94a3b8;
+}
+hr {
+    border-color: #2d3a4f;
+    margin: 1.5rem 0;
+}
+</style>
 """, unsafe_allow_html=True)
 
-# --- Логика ---
+# --- Вспомогательные функции ---
 def calculate_standings():
-    """Возвращает статистику и отсортированный список игроков."""
-    stats = defaultdict(lambda: {'wins': 0, 'losses': 0, 'points_for': 0, 'points_against': 0, 'gd': 0, 'played': 0})
+    """Возвращает статистику и отсортированный список игроков по очкам (3 за победу, 1 за поражение)."""
+    stats = defaultdict(lambda: {
+        'wins': 0, 'losses': 0, 'points_for': 0, 'points_against': 0,
+        'gd': 0, 'played': 0, 'pts': 0
+    })
     for m in st.session_state.matches:
         p1, p2, o1, o2 = m['p1'], m['p2'], m['o1'], m['o2']
         winner = p1 if o1 > o2 else p2
+        loser = p2 if o1 > o2 else p1
+
         stats[p1]['played'] += 1
         stats[p2]['played'] += 1
         stats[p1]['points_for'] += o1
@@ -146,18 +217,27 @@ def calculate_standings():
         stats[p2]['points_against'] += o1
         stats[p1]['gd'] += o1 - o2
         stats[p2]['gd'] += o2 - o1
+
         if winner == p1:
             stats[p1]['wins'] += 1
+            stats[p1]['pts'] += 3
             stats[p2]['losses'] += 1
+            stats[p2]['pts'] += 1   # за поражение даём 1 очко (можно настроить)
         else:
             stats[p2]['wins'] += 1
+            stats[p2]['pts'] += 3
             stats[p1]['losses'] += 1
-    sorted_players = sorted(st.session_state.players,
-                            key=lambda p: (-stats[p]['wins'], -stats[p]['gd'], -stats[p]['points_for']))
+            stats[p1]['pts'] += 1
+
+    # Сортировка: по очкам, потом по разнице, потом по забитым
+    sorted_players = sorted(
+        st.session_state.players,
+        key=lambda p: (-stats[p]['pts'], -stats[p]['gd'], -stats[p]['points_for'])
+    )
     return stats, sorted_players
 
 def parse_score(score_str, target):
-    """Парсит строку счёта, проверяет валидность относительно target."""
+    """Парсит строку счёта, проверяет валидность."""
     parts = score_str.replace(":", " ").split()
     if len(parts) != 2:
         raise ValueError("Формат: X:Y (например, 11:8)")
@@ -174,9 +254,10 @@ def parse_score(score_str, target):
     return o1, o2
 
 def seed_players(players, size):
-    """Размещает игроков в сетке по стандартному сеянию, возвращает слоты."""
+    """Размещает игроков по слотам сетки согласно стандартному сеянию."""
     slots = ["TBD"] * size
     n = len(players)
+    # Заполняем с краёв поочерёдно
     left, right = 0, size - 1
     for i, p in enumerate(players):
         if i % 2 == 0:
@@ -188,51 +269,54 @@ def seed_players(players, size):
     return slots
 
 def generate_playoff_bracket():
-    """Генерирует полную сетку плей-офф с учётом баев и автоматически завершает матчи с TBD."""
+    """Строит сетку плей-офф и обрабатывает баи."""
     stats, sorted_players = calculate_standings()
-    n_players = len(sorted_players)
-    # ближайшая степень двойки, не меньше n_players
+    n = len(sorted_players)
+    # Определяем размер сетки (ближайшая степень двойки, но не менее 4)
     size = 1
-    while size < n_players:
+    while size < n:
         size *= 2
     if size < 4:
-        size = 4  # минимум 4 для полуфиналов + финал + матч за 3 место
-    # размещаем игроков
+        size = 4
+
     slots = seed_players(sorted_players, size)
-    # формируем первый раунд
-    matches_round1 = []
+
+    # Первый раунд
+    round1_matches = []
     for i in range(0, size, 2):
-        matches_round1.append({
+        round1_matches.append({
             "p1": slots[i],
             "p2": slots[i+1],
             "winner": None,
             "score": ""
         })
     rounds = [{"name": "1/8 финала" if size == 16 else ("1/4 финала" if size == 8 else "1/2 финала"),
-               "matches": matches_round1}]
-    # создаём следующие раунды
-    current_size = size
-    while current_size > 1:
-        current_size //= 2
-        if current_size == 1:
-            round_name = "Финал"
-        elif current_size == 2:
-            round_name = "Полуфиналы"
-        elif current_size == 4:
-            round_name = "Четвертьфиналы"
+               "matches": round1_matches}]
+
+    # Последующие раунды
+    cur_size = size
+    while cur_size > 1:
+        cur_size //= 2
+        if cur_size == 1:
+            name = "Финал"
+        elif cur_size == 2:
+            name = "Полуфиналы"
+        elif cur_size == 4:
+            name = "Четвертьфиналы"
         else:
-            round_name = f"1/{current_size*2} финала"  # например, 1/8
-        empty_matches = [{"p1": "TBD", "p2": "TBD", "winner": None, "score": ""} for _ in range(current_size)]
-        rounds.append({"name": round_name, "matches": empty_matches})
-    # матч за 3-е место
+            name = f"1/{cur_size*2} финала"
+        empty = [{"p1": "TBD", "p2": "TBD", "winner": None, "score": ""} for _ in range(cur_size)]
+        rounds.append({"name": name, "matches": empty})
+
+    # Матч за 3-е место
     rounds.append({"name": "Матч за 3-е место", "matches": [{"p1": "TBD", "p2": "TBD", "winner": None, "score": ""}]})
+
     st.session_state.playoff_bracket = rounds
-    # Автоматически обрабатываем баи (матчи с TBD) в первом раунде
+    # Автоматическая обработка баев в первом раунде
     process_byes(0)
 
 def process_byes(round_idx):
-    """Проверяет матчи в указанном раунде: если один из участников TBD, победителем становится другой,
-       и прокидка происходит автоматически."""
+    """Проверяет матчи раунда, если один из участников TBD – победителем становится другой."""
     bracket = st.session_state.playoff_bracket
     if round_idx >= len(bracket):
         return
@@ -246,15 +330,14 @@ def process_byes(round_idx):
         elif p2 == "TBD" and p1 != "TBD":
             m['winner'] = p1
             m['score'] = "Бай"
-        # если оба TBD – ничего не делаем (такого быть не должно)
-    # После обработки текущего раунда прокидваем победителей в следующий раунд
+    # Прокидываем победителей в следующий раунд
     propagate_winners(round_idx)
 
 def propagate_winners(round_idx):
-    """Прокидывает победителей из раунда round_idx в следующий раунд."""
+    """Передаёт победителей из текущего раунда в следующий."""
     bracket = st.session_state.playoff_bracket
     if round_idx >= len(bracket) - 1:
-        return  # последний раунд (матч за 3 место) не прокидвается дальше
+        return
     next_round = bracket[round_idx + 1]
     current_round = bracket[round_idx]
     for i, m in enumerate(current_round['matches']):
@@ -265,18 +348,17 @@ def propagate_winners(round_idx):
             next_round['matches'][next_match_idx]['p1'] = m['winner']
         else:
             next_round['matches'][next_match_idx]['p2'] = m['winner']
-    # Рекурсивно обрабатываем следующий раунд (если там уже все победители известны – они и так записаны)
+    # Проверяем следующий раунд на баи (рекурсивно)
     process_byes(round_idx + 1)
 
 def render_bracket_html():
-    """Генерирует HTML для визуализации сетки с подсветкой текущего матча."""
+    """Генерирует HTML‑код для отображения сетки."""
     html = "<div class='bracket-container'>"
     bracket = st.session_state.playoff_bracket
     for r_idx, round_data in enumerate(bracket):
-        html += f"<div class='round-column'><h4 style='color:#f97316; text-align:center; margin-bottom:15px;'>{round_data['name']}</h4>"
+        html += f"<div class='round-column'><h4 style='color:#f97316; text-align:center; margin-bottom:0.8rem;'>{round_data['name']}</h4>"
         for m in round_data['matches']:
             p1, p2, sc, winner = m['p1'], m['p2'], m['score'], m['winner']
-            # Определяем, является ли матч баем
             is_bye = (p1 == "TBD" or p2 == "TBD") and winner is not None and sc == "Бай"
             p1_class = "winner-text" if winner == p1 else ("loser-text" if winner else "team-name")
             p2_class = "winner-text" if winner == p2 else ("loser-text" if winner else "team-name")
@@ -284,13 +366,17 @@ def render_bracket_html():
             if is_bye:
                 match_class += " bye-match"
             # Подсветка текущего матча (если ещё не сыгран и оба участника известны)
-            if not winner and p1 != "TBD" and p2 != "TBD" and r_idx == st.session_state.get('current_round_idx', 0):
-                match_class += " highlight-match"
-            score_parts = sc.split(":") if sc and sc != "Бай" else ["", ""]
-            s1 = score_parts[0] if len(score_parts) > 0 else ""
-            s2 = score_parts[1] if len(score_parts) > 1 else ""
-            if is_bye:
-                s1, s2 = "—", "—"  # для бая не показываем счёт
+            if not winner and p1 != "TBD" and p2 != "TBD":
+                # отметим, что этот матч активен (можно использовать глобальный флаг)
+                match_class += " highlight"
+
+            if sc == "Бай":
+                s1, s2 = "—", "—"
+            else:
+                parts = sc.split(":")
+                s1 = parts[0] if len(parts) > 0 else ""
+                s2 = parts[1] if len(parts) > 1 else ""
+
             html += f"""
                 <div class='bracket-match {match_class}'>
                     <div class='bracket-team'><span class='{p1_class}'>{p1 if p1!="TBD" else "—"}</span> <span class='team-score'>{s1}</span></div>
@@ -301,13 +387,10 @@ def render_bracket_html():
     html += "</div>"
     st.markdown(html, unsafe_allow_html=True)
 
-# --- Интерфейс ---
-st.markdown("<h1 style='text-align:center; color:#f97316;'>🏓 PING-PONG PRO</h1>", unsafe_allow_html=True)
-
-# Боковое меню
+# --- Боковая панель ---
 with st.sidebar:
     st.markdown("### ⚙️ Управление")
-    if st.session_state.stage != 'setup':
+    if st.session_state.stage != "setup":
         if st.button("🔄 Сбросить турнир", use_container_width=True):
             for key in list(st.session_state.keys()):
                 del st.session_state[key]
@@ -315,13 +398,15 @@ with st.sidebar:
             st.rerun()
     st.markdown("---")
     st.markdown("### 💾 Сохранение")
-    if st.session_state.stage != 'setup':
-        # Создаём копию состояния для сохранения
+    if st.session_state.stage != "setup":
         save_data = {k: v for k, v in st.session_state.items()}
-        st.download_button("⬇️ Скачать прогресс (.json)",
-                           data=json.dumps(save_data, ensure_ascii=False, default=str),
-                           file_name="tournament_save.json")
-    uploaded = st.file_uploader("⬆️ Загрузить прогресс", type=['json'])
+        st.download_button(
+            "⬇️ Скачать прогресс (.json)",
+            data=json.dumps(save_data, ensure_ascii=False, default=str),
+            file_name="tournament_save.json",
+            use_container_width=True
+        )
+    uploaded = st.file_uploader("⬆️ Загрузить прогресс", type=["json"])
     if uploaded:
         try:
             data = json.load(uploaded)
@@ -333,58 +418,66 @@ with st.sidebar:
             st.error("Ошибка файла")
     st.markdown("---")
     st.markdown("### ℹ️ Инфо")
-    st.caption(f"Версия 2.0 • {st.session_state.tournament_name}")
+    st.caption(f"Версия 3.0 • {st.session_state.tournament_name}")
+
+# --- Основной интерфейс ---
+st.markdown("<h1 style='text-align:center; color:#f97316;'>🏓 PING-PONG PRO</h1>", unsafe_allow_html=True)
 
 # --- ЭТАП 1: НАСТРОЙКА ---
-if st.session_state.stage == 'setup':
-    st.markdown("<div class='main-card'>", unsafe_allow_html=True)
-    st.markdown("<h2>Настройка турнира</h2>", unsafe_allow_html=True)
+if st.session_state.stage == "setup":
+    with st.container():
+        st.markdown("<div class='main-card'>", unsafe_allow_html=True)
+        st.markdown("<h2 style='text-align:center;'>Настройка турнира</h2>", unsafe_allow_html=True)
 
-    col1, col2 = st.columns([1, 2])
-    with col1:
-        num_players = st.number_input("Игроков", 2, 16, min(4, 4), 1)
-        target = st.selectbox("Очков для победы", [11, 15, 21], index=0)
-    with col2:
-        st.write("Введите имена участников:")
-        names = []
-        for i in range(int(num_players)):
-            names.append(st.text_input(f"Игрок {i+1}", key=f"p_{i}"))
-    # Кнопка редактирования (очищает имена для повторного ввода)
-    if st.button("СТАРТ 🚀", use_container_width=True):
-        if any(n.strip() == "" for n in names):
-            st.error("Заполните все имена!")
-        else:
-            st.session_state.players = [n.strip() for n in names]
-            st.session_state.target_score = target
-            st.session_state.pairs = list(itertools.combinations(st.session_state.players, 2))
-            random.shuffle(st.session_state.pairs)
-            st.session_state.stage = 'group'
-            st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            num_players = st.number_input("Количество игроков", 2, 16, min(4, 4), 1)
+            target_score = st.selectbox("Очков для победы", [11, 15, 21], index=0)
+        with col2:
+            st.write("Введите имена участников:")
+            names = []
+            for i in range(int(num_players)):
+                names.append(st.text_input(f"Игрок {i+1}", key=f"setup_p_{i}"))
+
+        if st.button("🚀 СТАРТ ТУРНИР", use_container_width=True):
+            if any(n.strip() == "" for n in names):
+                st.error("Заполните все имена!")
+            else:
+                st.session_state.players = [n.strip() for n in names]
+                st.session_state.target_score = target_score
+                st.session_state.pairs = list(itertools.combinations(st.session_state.players, 2))
+                random.shuffle(st.session_state.pairs)
+                st.session_state.matches = []   # очищаем на всякий случай
+                st.session_state.stage = "group"
+                st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
 
 # --- ЭТАП 2: ГРУППОВОЙ ЭТАП ---
-elif st.session_state.stage == 'group':
-    col1, col2 = st.columns([1, 2])
+elif st.session_state.stage == "group":
+    col_left, col_right = st.columns([1, 2])
 
-    with col1:
+    with col_left:
         st.markdown("<div class='main-card'>", unsafe_allow_html=True)
         st.markdown("<h3>Текущий матч</h3>", unsafe_allow_html=True)
 
         played_idxs = {m['pair_idx'] for m in st.session_state.matches}
-        idx, current_match = next(((i, p) for i, p in enumerate(st.session_state.pairs) if i not in played_idxs), (None, None))
+        idx, current_match = next(
+            ((i, p) for i, p in enumerate(st.session_state.pairs) if i not in played_idxs),
+            (None, None)
+        )
 
         if current_match:
             p1, p2 = current_match
             st.markdown(f"<div class='player-name'>{p1}</div><div class='vs-text'>VS</div><div class='player-name'>{p2}</div>", unsafe_allow_html=True)
             with st.form("score_form"):
-                score = st.text_input("Счёт (например, 11:8)", placeholder=f"11:{st.session_state.target_score-2}")
+                score = st.text_input("Счёт (например, 11:8)", placeholder=f"{st.session_state.target_score}:{st.session_state.target_score-2}")
                 if st.form_submit_button("Сохранить результат", use_container_width=True):
                     try:
                         o1, o2 = parse_score(score, st.session_state.target_score)
                         st.session_state.matches.append({
-                            'p1': p1, 'p2': p2,
-                            'o1': o1, 'o2': o2,
-                            'pair_idx': idx
+                            "p1": p1, "p2": p2,
+                            "o1": o1, "o2": o2,
+                            "pair_idx": idx
                         })
                         st.rerun()
                     except ValueError as e:
@@ -395,14 +488,13 @@ elif st.session_state.stage == 'group':
                     st.rerun()
         else:
             st.success("Групповой этап завершён!")
-            if st.button("Сгенерировать Плей-офф 🏆", use_container_width=True):
+            if st.button("🏆 Сгенерировать Плей-офф", use_container_width=True):
                 generate_playoff_bracket()
-                st.session_state.stage = 'playoff'
-                st.session_state.current_round_idx = 0
+                st.session_state.stage = "playoff"
                 st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
 
-    with col2:
+    with col_right:
         st.markdown("<h3>Таблица лидеров</h3>", unsafe_allow_html=True)
         stats, sorted_p = calculate_standings()
         data = []
@@ -414,90 +506,87 @@ elif st.session_state.stage == 'group':
                 "В": stats[p]['wins'],
                 "П": stats[p]['losses'],
                 "Очки": f"{stats[p]['points_for']}:{stats[p]['points_against']}",
-                "Разница": stats[p]['gd']
+                "Разница": stats[p]['gd'],
+                "О": stats[p]['pts']
             })
         df = pd.DataFrame(data)
-        # Стилизация строк
-        def style_df(row):
-            colors = []
-            for _ in row:
-                if row.name < 4:
-                    colors.append('background-color: rgba(34, 197, 94, 0.15); color: #4ade80;')
-                else:
-                    colors.append('background-color: #0f172a; color: #f1f5f9;')
-            return colors
-        st.dataframe(df.style.apply(style_df, axis=1), use_container_width=True, hide_index=True)
+        # Стилизация
+        def highlight_top(row):
+            if row.name < 4:
+                return ['background-color: rgba(34,197,94,0.15); color: #4ade80;'] * len(row)
+            return ['background-color: #0f172a; color: #e2e8f0;'] * len(row)
+        st.dataframe(df.style.apply(highlight_top, axis=1), use_container_width=True, hide_index=True)
 
 # --- ЭТАП 3: ПЛЕЙ-ОФФ ---
-elif st.session_state.stage == 'playoff':
+elif st.session_state.stage == "playoff":
     st.markdown("<h2 style='text-align:center;'>🏆 Турнирная сетка</h2>", unsafe_allow_html=True)
     render_bracket_html()
 
-    st.markdown("---")
-
-    # Поиск текущего несыгранного матча (где оба участника известны, победитель не определён)
-    current_match = None
-    current_round_idx = None
-    current_match_idx = None
+    # Поиск текущего матча (несыгранного, с двумя известными игроками)
     bracket = st.session_state.playoff_bracket
-    for r_idx, round_data in enumerate(bracket):
-        for m_idx, m in enumerate(round_data['matches']):
+    current_match = None
+    r_idx = None
+    m_idx = None
+    for i, round_data in enumerate(bracket):
+        for j, m in enumerate(round_data['matches']):
             if m['winner'] is None and m['p1'] != "TBD" and m['p2'] != "TBD":
                 current_match = m
-                current_round_idx = r_idx
-                current_match_idx = m_idx
+                r_idx = i
+                m_idx = j
                 break
         if current_match:
             break
 
-    # Если есть матч для ввода счёта
     if current_match:
-        st.session_state.current_round_idx = current_round_idx
+        st.markdown("---")
         col1, col2 = st.columns([1, 2])
         with col1:
             st.markdown("<div class='main-card'>", unsafe_allow_html=True)
-            st.markdown(f"<h4>{bracket[current_round_idx]['name']}</h4>", unsafe_allow_html=True)
+            st.markdown(f"<h4>{bracket[r_idx]['name']}</h4>", unsafe_allow_html=True)
             st.markdown(f"<div class='player-name'>{current_match['p1']}</div><div class='vs-text'>VS</div><div class='player-name'>{current_match['p2']}</div>", unsafe_allow_html=True)
             with st.form("po_score"):
                 score = st.text_input("Счёт", placeholder=f"{st.session_state.target_score}:{st.session_state.target_score-2}")
-                if st.form_submit_button("Записать", use_container_width=True):
+                if st.form_submit_button("Записать результат", use_container_width=True):
                     try:
                         o1, o2 = parse_score(score, st.session_state.target_score)
                         winner = current_match['p1'] if o1 > o2 else current_match['p2']
                         loser = current_match['p2'] if o1 > o2 else current_match['p1']
+
                         # Сохраняем результат
-                        bracket[current_round_idx]['matches'][current_match_idx]['winner'] = winner
-                        bracket[current_round_idx]['matches'][current_match_idx]['score'] = f"{o1}:{o2}"
-                        # Прокидываем победителя в следующий раунд
-                        propagate_winners(current_round_idx)
-                        # Проверяем, не закончился ли турнир
+                        bracket[r_idx]['matches'][m_idx]['winner'] = winner
+                        bracket[r_idx]['matches'][m_idx]['score'] = f"{o1}:{o2}"
+
+                        # Прокидываем победителя дальше
+                        propagate_winners(r_idx)
+
+                        # Проверяем, не завершён ли турнир
                         if bracket[-2]['matches'][0]['winner'] is not None and bracket[-1]['matches'][0]['winner'] is not None:
                             st.session_state.champion = bracket[-2]['matches'][0]['winner']
                             st.session_state.third_place = bracket[-1]['matches'][0]['winner']
-                            st.session_state.stage = 'end'
+                            st.session_state.stage = "end"
                         st.rerun()
                     except ValueError as e:
                         st.error(str(e))
             st.markdown("</div>", unsafe_allow_html=True)
     else:
-        # Все матчи сыграны – переходим в финал
+        # Все матчи сыграны – возможно, осталось только финишировать
         if bracket[-2]['matches'][0]['winner'] is not None and bracket[-1]['matches'][0]['winner'] is not None:
             st.session_state.champion = bracket[-2]['matches'][0]['winner']
             st.session_state.third_place = bracket[-1]['matches'][0]['winner']
-            st.session_state.stage = 'end'
+            st.session_state.stage = "end"
             st.rerun()
         else:
             st.info("Все возможные матчи завершены. Ожидайте...")
 
 # --- ЭТАП 4: ФИНИШ ---
-elif st.session_state.stage == 'end':
-    third_place = st.session_state.playoff_bracket[-1]['matches'][0]['winner']
+elif st.session_state.stage == "end":
+    third = st.session_state.playoff_bracket[-1]['matches'][0]['winner']
     st.markdown(f"""
     <div class='champion-banner'>
-        <h2 style='color:#f97316; letter-spacing:3px; margin-bottom:10px;'>ЧЕМПИОН ТУРНИРА</h2>
-        <h1 style='font-size:50px; color:#fbbf24; text-shadow: 0 0 20px rgba(251, 191, 36, 0.5);'>{st.session_state.champion}</h1>
-        <h3 style='color:#94a3b8; margin-top:20px;'>🥉 3-е место: {third_place}</h3>
+        <h2 style='color:#f97316; letter-spacing:3px;'>ЧЕМПИОН ТУРНИРА</h2>
+        <h1 style='font-size:3.5rem; color:#fbbf24; text-shadow: 0 0 30px rgba(251,191,36,0.4);'>{st.session_state.champion}</h1>
+        <h3 style='color:#94a3b8; margin-top:1rem;'>🥉 3-е место: {third}</h3>
     </div>
     """, unsafe_allow_html=True)
-    st.markdown("<h3 style='text-align:center; margin-top:40px;'>Итоговая сетка</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='text-align:center; margin-top:2rem;'>Итоговая сетка</h3>", unsafe_allow_html=True)
     render_bracket_html()
